@@ -104,4 +104,4 @@ def load_dataset(config):
 	X_test, y_test, test_y = make_test(features_test, targets_test, config)
 
 	
-	return X_train, y_train, train_y, X_test, y_test, test_y
+	return X_train.to(config['device']), y_train.to(config['device']), train_y.to(config['device']), X_test.to(config['device']), y_test.to(config['device']), test_y.to(config['device'])

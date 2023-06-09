@@ -134,6 +134,7 @@ class ChannelBCEncoder(torch.nn.Module):
                                             squeeze_factor = squeeze_factor,
                                             sec_kernel_size = sec_kernel_size,
                                             sec_stride = sec_stride)
+        self.dropout = torch.nn.Dropout(p = dropout_rate)
     def forward(self, x):
         # (c) BC encoder
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)    
@@ -142,6 +143,7 @@ class ChannelBCEncoder(torch.nn.Module):
         out2 = self.FFN(x)
         out2 = self.layernorm_FFN(out2) + out
         out3 = self.SEC(out2) + out2
+        out3 = self.dropout(out3)
         return out3
 
 class ChannelAttention(torch.nn.Module):
@@ -335,6 +337,7 @@ class SliceBCEncoder(torch.nn.Module):
                                         squeeze_factor = squeeze_factor,
                                         sec_kernel_size = sec_kernel_size,
                                         sec_stride = sec_stride)
+        self.dropout = torch.nn.Dropout(p = dropout_rate)
 
     def forward(self, x):
         
@@ -345,6 +348,7 @@ class SliceBCEncoder(torch.nn.Module):
         out2 = self.FFN(x)
         out2 = self.layernorm_FFN(out2) + out
         out3 = self.SEC(out2) + out2
+        out3 = self.dropout(out3)
         return out3
 
 class SliceAttention(torch.nn.Module):
@@ -600,7 +604,7 @@ class Net(torch.nn.Module):
         numeric_y = torch.argmax(y, dim=1)
         # print(y_hat.shape)
         # print(numeric_y.long())
-        
+        y_hat = torch.clamp(y_hat, min=1e-5, max=1. - 1e-5)
         neg_log_likelihood = -1. * y_hat.log()[np.arange(y_hat.size(0)),numeric_y.long()] 
         
         # print(neg_log_likelihood.shape)
