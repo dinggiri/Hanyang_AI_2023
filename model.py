@@ -135,6 +135,7 @@ class ChannelBCEncoder(torch.nn.Module):
                                             sec_kernel_size = sec_kernel_size,
                                             sec_stride = sec_stride)
         self.dropout = torch.nn.Dropout(p = dropout_rate)
+
     def forward(self, x):
         # (c) BC encoder
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)    
@@ -177,7 +178,7 @@ class ChannelAttention(torch.nn.Module):
         # (b) linear token embedding
         self.linear_embedding1 = torch.nn.Linear(in_features = length - 6, 
                                                  out_features = dim_model)
-        self.BCEncoder = ChannelBCEncoder(dim_model = dim_model,
+        self.BCEncoder1 = ChannelBCEncoder(dim_model = dim_model,
                                         num_channels = second_out_channels + 1,
                                         num_samples = num_samples,
                                         num_heads = num_heads,
@@ -185,6 +186,17 @@ class ChannelAttention(torch.nn.Module):
                                         dim_inner = dim_inner,
                                         squeeze_factor = squeeze_factor,
                                         sec_in_channels = second_out_channels + 1,
+                                        sec_kernel_size = sec_kernel_size,
+                                        sec_stride = sec_stride
+                                        )
+        self.BCEncoder2 = ChannelBCEncoder(dim_model = dim_model,
+                                        num_channels = second_out_channels + 2,
+                                        num_samples = num_samples,
+                                        num_heads = num_heads,
+                                        dropout_rate = dropout_rate,
+                                        dim_inner = dim_inner,
+                                        squeeze_factor = squeeze_factor,
+                                        sec_in_channels = second_out_channels + 2,
                                         sec_kernel_size = sec_kernel_size,
                                         sec_stride = sec_stride
                                         )
@@ -201,7 +213,8 @@ class ChannelAttention(torch.nn.Module):
         x = self.act(x)
         # (b) linear token embedding
         x = self.linear_embedding1(x)
-        x = self.BCEncoder(x)
+        x = self.BCEncoder1(x)
+        x = self.BCEncoder2(x)
         x_rep = x[:,0]
         # print(x_rep.shape)
         return x_rep
@@ -404,7 +417,18 @@ class SliceAttention(torch.nn.Module):
                                                  out_features = dim_model)
         self.cls_token = torch.nn.Parameter(torch.zeros(1, 1, dim_model))
         
-        self.BCEncoder = SliceBCEncoder(dim_model=dim_model,
+        self.BCEncoder1 = SliceBCEncoder(dim_model=dim_model,
+                                         num_samples = num_samples,
+                                         num_channels = N + 1,
+                                         dim_inner = dim_inner,
+                                         num_heads = num_heads,
+                                         dropout_rate = dropout_rate,
+                                         sec_first_in_channels = N + 1,
+                                         squeeze_factor = squeeze_factor,
+                                         sec_kernel_size = sec_kernel_size,
+                                         sec_stride = sec_stride
+                                        )
+        self.BCEncoder2 = SliceBCEncoder(dim_model=dim_model,
                                          num_samples = num_samples,
                                          num_channels = N + 1,
                                          dim_inner = dim_inner,
@@ -479,7 +503,8 @@ class SliceAttention(torch.nn.Module):
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)    
         pe = self._position_embedding(x)
 
-        x = self.BCEncoder(x)
+        x = self.BCEncoder1(x)
+        x = self.BCEncoder2(x)
         x_rep = x[:,0]
         # print(x_rep.shape)
         return x_rep
@@ -628,6 +653,7 @@ class Net(torch.nn.Module):
     # def
     def forward(self, x):
         # print(self.d)
+        x = x.float()
         x1 = self.channelattention(x)
         x2 = self.sliceattention(x)
         
