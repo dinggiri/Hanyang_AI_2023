@@ -3,6 +3,7 @@ from tqdm import tqdm
 import torch
 import numpy as np
 import math
+from torcheval.metrics.functional import multiclass_f1_score
 
 ##################################################################
 ######################## Channel Attention #######################
@@ -141,7 +142,7 @@ class ChannelBCEncoder(torch.nn.Module):
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)    
         out = self.MSA(x, x, x)
         out = self.layernorm_MSA(out) + x
-        out2 = self.FFN(x)
+        out2 = self.FFN(out)
         out2 = self.layernorm_FFN(out2) + out
         out3 = self.SEC(out2) + out2
         out3 = self.dropout(out3)
@@ -358,7 +359,7 @@ class SliceBCEncoder(torch.nn.Module):
         
         out = self.MSA(x, x, x)
         out = self.layernorm_MSA(out) + x
-        out2 = self.FFN(x)
+        out2 = self.FFN(out)
         out2 = self.layernorm_FFN(out2) + out
         out3 = self.SEC(out2) + out2
         out3 = self.dropout(out3)
@@ -635,7 +636,7 @@ class Net(torch.nn.Module):
         # print(neg_log_likelihood.shape)
         return neg_log_likelihood
 
-    def calculate_classification_error(self, x, y):
+    def calculate_classification_error(self, x, y, f1 = False):
         y_hat = self.forward(x)
         # print(y_hat)
 
@@ -648,6 +649,14 @@ class Net(torch.nn.Module):
         one_hot_y[torch.arange(y_hat.size(0)), max_values] = 1
 
         error = y.eq(one_hot_y).float().mean() * 100
+
+        if f1:
+            # print(y_hat.shape)
+            # print(y.shape)
+            _, gts = torch.max(y, dim=1)
+
+            f1_macro = multiclass_f1_score(y_hat, gts, num_classes = one_hot_y.shape[1], average="macro")
+            return error, f1_macro
         return error
 
     # def
