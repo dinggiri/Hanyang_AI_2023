@@ -25,15 +25,10 @@ class SelfAttentionChannel(torch.nn.Module):
         # before : (batch_size, sequence_length, dim_model)
         # split dim_model -> num_heads, depth and transpose 
         # after  : (batch_size, num_heads, sequence_length, depth)
-        # print(x.size(-1))
-        # print(self.num_heads)
         x = x.reshape(batch_size, -1, self.num_heads, x.size(-1) // self.num_heads)
         return x.transpose(1, 2)
 
     def _calculate_attention(self, q, k, v):
-        # print("q :", q.shape)
-        # print("k :", k.shape)
-        # print("v :", v.shape)
         att_score = torch.matmul(q, k.transpose(2,3))
         dk = q.shape[-1]
         scaled_att_score = att_score / math.sqrt(dk)
@@ -49,7 +44,7 @@ class SelfAttentionChannel(torch.nn.Module):
         k = self.wk(k)
         v = self.wk(v)
 
-        #split the unihead into multihead
+        # split the unihead into multihead
         # (batch size, num_heads, sequence_length, depth)
         q = self._split_heads(q, batch_size)
         k = self._split_heads(k, batch_size)
@@ -120,7 +115,6 @@ class ChannelBCEncoder(torch.nn.Module):
                 sec_kernel_size,
                 sec_stride):
         super(ChannelBCEncoder, self).__init__()
-        # (c) BC encoder
         self.cls_token = torch.nn.Parameter(torch.zeros(1, 1, dim_model))
         self.layernorm_MSA = torch.nn.LayerNorm(( num_channels, dim_model))
         self.layernorm_FFN = torch.nn.LayerNorm(( num_channels, dim_model))
@@ -138,7 +132,6 @@ class ChannelBCEncoder(torch.nn.Module):
         self.dropout = torch.nn.Dropout(p = dropout_rate)
 
     def forward(self, x):
-        # (c) BC encoder
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)    
         out = self.MSA(x, x, x)
         out = self.layernorm_MSA(out) + x
@@ -179,6 +172,7 @@ class ChannelAttention(torch.nn.Module):
         # (b) linear token embedding
         self.linear_embedding1 = torch.nn.Linear(in_features = length - 6, 
                                                  out_features = dim_model)
+        # (c) BC Encoders
         self.BCEncoder1 = ChannelBCEncoder(dim_model = dim_model,
                                         num_channels = second_out_channels + 1,
                                         num_samples = num_samples,
@@ -204,8 +198,6 @@ class ChannelAttention(torch.nn.Module):
 
     def forward(self, x):
         # (a) two convolution layers
-        # print(x.shape)
-        # print(x.type())
         x = self.conv_1(x)
         x = self.norm_1(x)
         x = self.act(x)
@@ -214,10 +206,10 @@ class ChannelAttention(torch.nn.Module):
         x = self.act(x)
         # (b) linear token embedding
         x = self.linear_embedding1(x)
+        # (c) BC Encoders
         x = self.BCEncoder1(x)
         x = self.BCEncoder2(x)
         x_rep = x[:,0]
-        # print(x_rep.shape)
         return x_rep
 
 ##################################################################
@@ -240,15 +232,10 @@ class SelfAttentionSlice(torch.nn.Module):
         # before : (batch_size, sequence_length, dim_model)
         # split dim_model -> num_heads, depth and transpose 
         # after  : (batch_size, num_heads, sequence_length, depth)
-        # print(x.size(-1))
-        # print(self.num_heads)
         x = x.reshape(batch_size, -1, self.num_heads, x.size(-1) // self.num_heads)
         return x.transpose(1, 2)
 
     def _calculate_attention(self, q, k, v):
-        # print("q :", q.shape)
-        # print("k :", k.shape)
-        # print("v :", v.shape)
         att_score = torch.matmul(q, k.transpose(2,3))
         dk = q.shape[-1]
         scaled_att_score = att_score / math.sqrt(dk)
@@ -266,7 +253,6 @@ class SelfAttentionSlice(torch.nn.Module):
 
         #split the unihead into multihead
         # (batch size, num_heads, sequence_length, depth)
-        # print(q.shape)
         q = self._split_heads(q, batch_size)
         k = self._split_heads(k, batch_size)
         v = self._split_heads(v, batch_size)
@@ -337,7 +323,6 @@ class SliceBCEncoder(torch.nn.Module):
 
                  ):
         super(SliceBCEncoder, self).__init__()
-        # (c) BC encoder
         
         self.layernorm_MSA = torch.nn.LayerNorm(( num_channels, dim_model))
         self.layernorm_FFN = torch.nn.LayerNorm(( num_channels, dim_model))
@@ -354,9 +339,6 @@ class SliceBCEncoder(torch.nn.Module):
         self.dropout = torch.nn.Dropout(p = dropout_rate)
 
     def forward(self, x):
-        
-        # (c) BC encoder
-        
         out = self.MSA(x, x, x)
         out = self.layernorm_MSA(out) + x
         out2 = self.FFN(out)
@@ -378,7 +360,6 @@ class SliceAttention(torch.nn.Module):
                  dim_model,
                  dim_inner,
                 num_samples,
-                # num_channels,
                 length,
                 num_heads,
                 dropout_rate ,
@@ -417,7 +398,7 @@ class SliceAttention(torch.nn.Module):
         self.linear_embedding = torch.nn.Linear(in_features = self.length - 6, 
                                                  out_features = dim_model)
         self.cls_token = torch.nn.Parameter(torch.zeros(1, 1, dim_model))
-        
+         # (c) BC encoder
         self.BCEncoder1 = SliceBCEncoder(dim_model=dim_model,
                                          num_samples = num_samples,
                                          num_channels = N + 1,
@@ -459,12 +440,10 @@ class SliceAttention(torch.nn.Module):
 
 
     def forward(self, x):
-        # channels = torch.Tensor([])
         slice_length = int(np.floor(x.size(-1)/self.N))
         i = 0
         
         x1 = x[:, :, i:i+slice_length]
-        # print(x1.shape)
         x2 = x[:, :, i+slice_length:i+slice_length*2]
         x3 = x[:, :, i+slice_length*2:i+slice_length*3]
         # X1
@@ -481,7 +460,6 @@ class SliceAttention(torch.nn.Module):
         x3 = self.act(x3)
 
         # shared
-        # print(x1.grad)
         x1 = self.sliceconv(x1)
         x1 = self.slicenorm(x1)
         x1 = self.act(x1)
@@ -491,7 +469,6 @@ class SliceAttention(torch.nn.Module):
         x3 = self.sliceconv(x3)
         x3 = self.slicenorm(x3)
         x3 = self.act(x3)
-        # print(x1.shape, x2.shape, x3.shape) # v : num of last filter : 16, df : output dim : 27
 
         #ChannelFusion
         x1 = self.ChannelFusion(x1) 
@@ -507,7 +484,6 @@ class SliceAttention(torch.nn.Module):
         x = self.BCEncoder1(x)
         x = self.BCEncoder2(x)
         x_rep = x[:,0]
-        # print(x_rep.shape)
         return x_rep
 
 
@@ -523,8 +499,8 @@ class Net(torch.nn.Module):
                 second_in_channels = 32,
                 second_out_channels = 16,
                 second_kernel_size = 3,
-                N = 3,  #slice
-                L = 100, # slice
+                N = 3,  
+                L = 100, 
                 dim_inner = 128,
                 num_samples = 40, 
                 length = 100, 
@@ -561,8 +537,6 @@ class Net(torch.nn.Module):
                                              dim_model = dim_model,
                                              dim_inner = dim_inner,
                                             num_samples = num_samples, 
-                                            # num_channels = N + 1, # 
-
                                             length = length, 
                                             num_heads = num_heads,
                                             dropout_rate = dropout_rate,
@@ -580,30 +554,26 @@ class Net(torch.nn.Module):
         )
         self.attention_weight = torch.nn.Linear(self.u, 1)
         self.attention_softmax = torch.nn.Softmax(dim = 1)
-        self.classifier = torch.nn.Softmax(dim = -1)# self.A = torch.
+        self.classifier = torch.nn.Softmax(dim = -1)
+        self.history_Xrep = []
+        self.history_prototype = []
 
     def _prototype_learning(self, X_rep, y, classes):
         C_all = []
-        # print(X_rep.shape)
         for cls in classes:
-            H = []#torch.zeros(X_rep.shape)
+            H = []
             for i in range(X_rep.size(0)):
                 if y[i] == cls:
                     H.append(X_rep[i, :])
-            # print("H", len(H), H[0].shape)
             H = torch.stack(H)
-            # print(cls, ":",H.shape)
             A = self.attention_V(H)
             wA = self.attention_weight(A)
             wA = torch.transpose(wA, 1, 0)
             wA = self.attention_softmax(wA)
-
             class_prototype = torch.mm(wA, H)
             C_all.append(class_prototype)
-            # print(class_prototype.shape)
-        C_all = torch.stack(C_all)#.squeeze(1)
-        # print(C_all.shape)
-        # print(X_rep.shape)
+        C_all = torch.stack(C_all)
+
         return C_all
 
     def calculate_distance(self, x, C):
@@ -612,72 +582,46 @@ class Net(torch.nn.Module):
             dist = -1 * (x - c).pow(2).sum(-1).sqrt()
             dists.append(dist)
         dists = torch.stack(dists)
-        # print(dists.shape)
         probs = torch.nn.functional.softmax(dists, dim = 0)
-        # probs = self.classifier(dists)
-        # print(probs.shape)
         return probs
-    
 
     def calculate_objective(self, x, y):
-        # y=y.float()
-        # print(x.shape)
-        # x = x.double()
         y_hat = self.forward(x)
         y_hat = y_hat.float()
         y = y.float()
-        # print(y_hat_s)
         numeric_y = torch.argmax(y, dim=1)
-        # print(y_hat.shape)
-        # print(numeric_y.long())
         y_hat = torch.clamp(y_hat, min=1e-5, max=1. - 1e-5)
         neg_log_likelihood = -1. * y_hat.log()[np.arange(y_hat.size(0)),numeric_y.long()] 
         
-        # print(neg_log_likelihood.shape)
         return neg_log_likelihood
+
 
     def calculate_classification_error(self, x, y, f1 = False):
         y_hat = self.forward(x)
-        # print(y_hat)
-
         _, max_values = torch.max(y_hat, dim=1)
-        # print(max_values)
         max_values = max_values.long()
         one_hot_y = torch.zeros_like(y_hat)
-        # print(one_hot_y)
-        # print(y)
         one_hot_y[torch.arange(y_hat.size(0)), max_values] = 1
 
         error = y.eq(one_hot_y).float().mean() * 100
 
         if f1:
-            # print(y_hat.shape)
-            # print(y.shape)
             _, gts = torch.max(y, dim=1)
-
             f1_macro = multiclass_f1_score(y_hat, gts, num_classes = one_hot_y.shape[1], average="macro")
             return error, f1_macro
         return error
 
-    # def
+
     def forward(self, x):
-        # print(self.d)
         x = x.float()
         x1 = self.channelattention(x)
         x2 = self.sliceattention(x)
-        
-        # print(x1.shape, x2.shape)
         x = torch.cat((x1, x2), dim = -1)
-        x = self.fc(x) # 1 x 32
-        # x = torch.unsqueeze(x, 1 )
-        # print("X shape", x.shape)
-        
-        prototypes = self._prototype_learning(x, self.ys, classes=[i for i in range(self.num_classes)]) # C_all을 구함
-        # x = x.unsqueeze(1)
-        # print("xrep shape", x.shape) # 40, 1, 32
-        # print(prototypes.shape) # 4, 1, 32
+        x = self.fc(x)
+        self.history_Xrep.append(x)
+        prototypes = self._prototype_learning(x, self.ys, classes=[i for i in range(self.num_classes)]) # C_all
+        self.history_prototype.append(prototypes)
         x = self.calculate_distance(x, prototypes)
-        # print(a.shape)
         x = x.transpose(0, 1) # batch_size, class, 1, dim_model
 
         return x

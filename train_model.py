@@ -1,9 +1,10 @@
 from torch.autograd import Variable
 
-def train(X_train, train_y, optimizer, model = None, epochs = 3000, verbose = True, f1 = False):
+def train(X_train, train_y, optimizer, model = None, epochs = 3000, verbose = True, f1 = False, get_prototypes = False):
     train_loss = []
     train_acc = []
     train_f1 = []
+    train_prototypes = []
 
     model.train()
     X, y = Variable(X_train), Variable(train_y)
