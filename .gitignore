@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+data/pickles/
 *.py[cod]
 *$py.class
 *.pickles
