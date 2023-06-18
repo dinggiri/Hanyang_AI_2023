@@ -5,6 +5,7 @@ def train(X_train, train_y, optimizer, model = None, epochs = 3000, verbose = Tr
     train_acc = []
     train_f1 = []
     train_prototypes = []
+    train_representation = []
 
     model.train()
     X, y = Variable(X_train), Variable(train_y)
@@ -29,9 +30,16 @@ def train(X_train, train_y, optimizer, model = None, epochs = 3000, verbose = Tr
                 print('Epoch: {}, Loss: {:.4f}, Train acc: {:.4f}%'.format(epoch, loss, acc))
             else:
                 print('Epoch: {}, Loss: {:.4f}, Train acc: {:.4f}%, F1 macro: {:.4f}'.format(epoch, loss, acc, f1_score))
-                
+        if get_prototypes:
+            if epoch in range(0, 3000, 250):
+                train_prototypes.append(model.history_prototype)
+                train_representation.append(model.history_Xrep)
 
     if not f1:
+        if get_prototypes:
+            return train_loss, train_acc, train_prototypes, train_representation    
         return train_loss, train_acc
     else:
+        if get_prototypes:
+            return train_loss, train_acc, train_f1, train_prototypes, train_representation    
         return train_loss, train_acc, train_f1

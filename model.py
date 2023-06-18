@@ -555,8 +555,8 @@ class Net(torch.nn.Module):
         self.attention_weight = torch.nn.Linear(self.u, 1)
         self.attention_softmax = torch.nn.Softmax(dim = 1)
         self.classifier = torch.nn.Softmax(dim = -1)
-        self.history_Xrep = []
-        self.history_prototype = []
+        self.history_Xrep = None
+        self.history_prototype = None
 
     def _prototype_learning(self, X_rep, y, classes):
         C_all = []
@@ -618,9 +618,9 @@ class Net(torch.nn.Module):
         x2 = self.sliceattention(x)
         x = torch.cat((x1, x2), dim = -1)
         x = self.fc(x)
-        self.history_Xrep.append(x)
+        self.history_Xrep = x
         prototypes = self._prototype_learning(x, self.ys, classes=[i for i in range(self.num_classes)]) # C_all
-        self.history_prototype.append(prototypes)
+        self.history_prototype = prototypes
         x = self.calculate_distance(x, prototypes)
         x = x.transpose(0, 1) # batch_size, class, 1, dim_model
 
