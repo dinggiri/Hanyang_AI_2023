@@ -1,7 +1,11 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 data/pickles/
-data/
+data/AtrialFibrillation/
+data/BasicMotions/
+data/Epilepsy/
+data/processed/
+data/raw/
 *.py[cod]
 *$py.class
 *.pickles
